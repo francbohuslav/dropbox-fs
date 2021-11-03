@@ -1,0 +1,38 @@
+{
+    "name": "dropbox-fs",
+    "version": "1.0.0",
+    "description": "File system that uses dropbox as primary storage",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "watch": "tsc --watch ",
+        "nodemon": "nodemon",
+        "test": "jest -c jest.config.js --runInBand",
+        "test-watch": "jest -c jest.config.js --watch --runInBand"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/francbohuslav/dropbox-fs.git"
+    },
+    "keywords": [
+        "dropbox",
+        "fs"
+    ],
+    "author": "Bogan <franc.bohuslav@gmail.com>",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/francbohuslav/dropbox-fs/issues"
+    },
+    "homepage": "https://github.com/francbohuslav/dropbox-fs#readme",
+    "devDependencies": {
+        "@types/jest": "^27.0.2",
+        "@types/node": "^16.11.6",
+        "jest": "^27.3.1",
+        "ts-jest": "^27.0.7",
+        "typescript": "^4.4.4"
+    },
+    "dependencies": {
+        "dropbox-v2-api": "^2.4.51"
+    }
+}

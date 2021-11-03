@@ -1,0 +1,4 @@
+/node_modules
+/.vscode
+/dropbox-fs.code-workspace
+/coverage
