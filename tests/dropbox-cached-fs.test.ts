@@ -15,15 +15,20 @@ async function deleteTestedFiles() {
     }
 }
 
-test("local file read, write, readdir", async () => {
+test("local file read, write, readdir, delete", async () => {
     await deleteTestedFiles();
     const fs = new CachedFs(null, null, localDataStorage);
     const expectedContent = "some content řščřščšč";
     await fs.writeFile("test.txt", expectedContent);
     const content = await fs.readFile("test.txt");
     expect(content).toEqual(expectedContent);
-    const files = await fs.readdir(".");
+    // readdir
+    let files = await fs.readdir(".");
     expect(files).toEqual([".gitkeep", "test.txt"]);
+    // delete
+    await fs.unlinkFile("test.txt");
+    files = await fs.readdir(".");
+    expect(files).toEqual([".gitkeep"]);
 });
 
 test("file exists", async () => {
@@ -103,5 +108,9 @@ class MockedMemoryClient implements IRemoteFs {
 
     public async writeFile(targetFile: string, targetPath: string): Promise<void> {
         this.files[targetPath] = await fsp.readFile(targetFile, { encoding: "utf-8" });
+    }
+
+    public async unlinkFile(remoteFilePath: string): Promise<void> {
+        delete this.files[remoteFilePath];
     }
 }

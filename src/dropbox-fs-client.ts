@@ -86,7 +86,7 @@ export class DropboxFsClient implements IRemoteFs {
         });
     }
 
-    public writeFile(targetFile: string, targetPath: string): Promise<void> {
+    public writeFile(sourceFile: string, targetPath: string): Promise<void> {
         targetPath = this.normalizeFilePath(targetPath);
         console.log(`Dropbox: upload file ${targetPath} ...`);
         return new Promise((resolve, reject) => {
@@ -108,7 +108,18 @@ export class DropboxFsClient implements IRemoteFs {
                     }
                 }
             );
-            fs.createReadStream(targetFile).pipe(uploadStream);
+            fs.createReadStream(sourceFile).pipe(uploadStream);
+        });
+    }
+
+    public unlinkFile(targetPath: string): Promise<void> {
+        targetPath = this.normalizeFilePath(targetPath);
+        console.log(`Dropbox: unlink file ${targetPath} ...`);
+        return this.client({
+            resource: "files/delete",
+            parameters: {
+                path: targetPath,
+            },
         });
     }
 

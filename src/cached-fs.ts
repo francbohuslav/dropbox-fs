@@ -74,4 +74,18 @@ export class CachedFs {
         const files = await this.readdir(path.dirname(filePath));
         return files.includes(path.basename(filePath));
     }
+
+    public async unlinkFile(filePath: string): Promise<void> {
+        const localFilePath = path.join(this.localDir, filePath);
+        if (fs.existsSync(localFilePath)) {
+            await fsp.unlink(localFilePath);
+        }
+        if (this.client) {
+            const remoteFilePath = path.join(this.remoteDir, filePath);
+            await this.client.unlinkFile(remoteFilePath);
+            const remotedir = path.dirname(remoteFilePath);
+            console.log(`Invalidate cache ${remotedir}`);
+            delete this.cache[remotedir];
+        }
+    }
 }
