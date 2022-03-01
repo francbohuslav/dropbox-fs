@@ -6,6 +6,7 @@ export declare class DropboxFsClient implements IRemoteFs {
     getUserInfo(): Promise<any>;
     readdir(folder: string): Promise<string[]>;
     readFile(path: string, targetFile: string): Promise<void>;
-    writeFile(targetFile: string, targetPath: string): Promise<void>;
+    writeFile(sourceFile: string, targetPath: string): Promise<void>;
+    unlinkFile(targetPath: string): Promise<void>;
     private normalizeFilePath;
 }

@@ -107,7 +107,7 @@ class DropboxFsClient {
             });
         });
     }
-    writeFile(targetFile, targetPath) {
+    writeFile(sourceFile, targetPath) {
         targetPath = this.normalizeFilePath(targetPath);
         console.log(`Dropbox: upload file ${targetPath} ...`);
         return new Promise((resolve, reject) => {
@@ -127,7 +127,17 @@ class DropboxFsClient {
                     resolve();
                 }
             });
-            fs.createReadStream(targetFile).pipe(uploadStream);
+            fs.createReadStream(sourceFile).pipe(uploadStream);
+        });
+    }
+    unlinkFile(targetPath) {
+        targetPath = this.normalizeFilePath(targetPath);
+        console.log(`Dropbox: unlink file ${targetPath} ...`);
+        return this.client({
+            resource: "files/delete",
+            parameters: {
+                path: targetPath,
+            },
         });
     }
     normalizeFilePath(filePath) {

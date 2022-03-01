@@ -111,6 +111,21 @@ class CachedFs {
             return files.includes(path.basename(filePath));
         });
     }
+    unlinkFile(filePath) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const localFilePath = path.join(this.localDir, filePath);
+            if (fs.existsSync(localFilePath)) {
+                yield fsp.unlink(localFilePath);
+            }
+            if (this.client) {
+                const remoteFilePath = path.join(this.remoteDir, filePath);
+                yield this.client.unlinkFile(remoteFilePath);
+                const remotedir = path.dirname(remoteFilePath);
+                console.log(`Invalidate cache ${remotedir}`);
+                delete this.cache[remotedir];
+            }
+        });
+    }
 }
 exports.CachedFs = CachedFs;
 //# sourceMappingURL=cached-fs.js.map

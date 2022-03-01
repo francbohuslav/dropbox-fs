@@ -9,4 +9,5 @@ export declare class CachedFs {
     writeFile(filePath: string, content: string): Promise<void>;
     readdir(dir: string): Promise<string[]>;
     fileExists(filePath: string): Promise<boolean>;
+    unlinkFile(filePath: string): Promise<void>;
 }
