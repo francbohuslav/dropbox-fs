@@ -8,22 +8,46 @@ const dropboxV2Api = require("dropbox-v2-api");
 export class DropboxFsClient implements IRemoteFs {
     private client: any;
     private clientRaw: any;
+    private refreshToken: string;
+    private tokenExpiresTimestamp: number = 0;
 
-    public connect(token: string) {
+    public init(appKey: string, appSecret: string, redirectUri: string) {
         const dropbox = dropboxV2Api.authenticate({
-            token,
+            client_id: appKey,
+            client_secret: appSecret,
+            token_access_type: "offline",
+            redirect_uri: redirectUri,
         });
         this.clientRaw = dropbox;
         this.client = promisify(dropbox);
     }
 
-    public getUserInfo(): Promise<any> {
-        return this.client({
+    public generateAuthUrl(): string {
+        const url = this.clientRaw.generateAuthUrl();
+        console.log("Dropbox: auth URL", url);
+        return url;
+    }
+
+    public async getRefreshToken(authCode: string): Promise<string> {
+        const response = await promisify(this.clientRaw.getToken)(authCode);
+        await promisify(this.clientRaw.refreshToken)(response.refresh_token);
+        console.log("Dropbox: refresh token", response.refresh_token);
+        return response.refresh_token;
+    }
+
+    public setRefreshToken(refreshToken: string): void {
+        this.refreshToken = refreshToken;
+    }
+
+    public async getUserInfo(): Promise<any> {
+        await this.refreshTokenIfNeeded();
+        return await this.client({
             resource: "users/get_current_account",
         });
     }
 
     public async readdir(folder: string): Promise<string[]> {
+        await this.refreshTokenIfNeeded();
         try {
             folder = this.normalizeFilePath(folder);
             console.log(`Dropbox: list files ${folder} ...`);
@@ -57,14 +81,15 @@ export class DropboxFsClient implements IRemoteFs {
             if ((err.error_summary + "").startsWith("path/not_found")) {
                 throw new FsError("Path not dound", "path-not-found", err);
             }
-            throw new FsError(err.error_summary, "unknown");
+            throw new FsError(err.error_summary || err, "unknown");
         }
     }
 
-    public readFile(path: string, targetFile: string): Promise<void> {
+    public async readFile(path: string, targetFile: string): Promise<void> {
+        await this.refreshTokenIfNeeded();
         path = this.normalizeFilePath(path);
         console.log(`Dropbox: download file ${path} ...`);
-        return new Promise((resolve, reject) => {
+        return await new Promise((resolve, reject) => {
             const stream = this.clientRaw(
                 {
                     resource: "files/download",
@@ -86,10 +111,11 @@ export class DropboxFsClient implements IRemoteFs {
         });
     }
 
-    public writeFile(sourceFile: string, targetPath: string): Promise<void> {
+    public async writeFile(sourceFile: string, targetPath: string): Promise<void> {
+        await this.refreshTokenIfNeeded();
         targetPath = this.normalizeFilePath(targetPath);
         console.log(`Dropbox: upload file ${targetPath} ...`);
-        return new Promise((resolve, reject) => {
+        return await new Promise((resolve, reject) => {
             const uploadStream = this.clientRaw(
                 {
                     resource: "files/upload",
@@ -112,10 +138,11 @@ export class DropboxFsClient implements IRemoteFs {
         });
     }
 
-    public unlinkFile(targetPath: string): Promise<void> {
+    public async unlinkFile(targetPath: string): Promise<void> {
+        await this.refreshTokenIfNeeded();
         targetPath = this.normalizeFilePath(targetPath);
         console.log(`Dropbox: unlink file ${targetPath} ...`);
-        return this.client({
+        return await this.client({
             resource: "files/delete",
             parameters: {
                 path: targetPath,
@@ -125,5 +152,13 @@ export class DropboxFsClient implements IRemoteFs {
 
     private normalizeFilePath(filePath: string): string {
         return filePath.replace(/\\/g, "/");
+    }
+
+    private async refreshTokenIfNeeded() {
+        if (new Date().getTime() > this.tokenExpiresTimestamp) {
+            const res = await promisify(this.clientRaw.refreshToken)(this.refreshToken);
+            this.tokenExpiresTimestamp = new Date().getTime() + (res.expires_in - 60 * 10) * 1000;
+            console.log("Dropbox: token expires in", new Date(this.tokenExpiresTimestamp).toISOString());
+        }
     }
 }

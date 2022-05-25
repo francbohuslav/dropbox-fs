@@ -34,20 +34,46 @@ const util_1 = require("util");
 const fs_error_1 = require("./fs-error");
 const dropboxV2Api = require("dropbox-v2-api");
 class DropboxFsClient {
-    connect(token) {
+    constructor() {
+        this.tokenExpiresTimestamp = 0;
+    }
+    init(appKey, appSecret, redirectUri) {
         const dropbox = dropboxV2Api.authenticate({
-            token,
+            client_id: appKey,
+            client_secret: appSecret,
+            token_access_type: "offline",
+            redirect_uri: redirectUri,
         });
         this.clientRaw = dropbox;
         this.client = (0, util_1.promisify)(dropbox);
     }
+    generateAuthUrl() {
+        const url = this.clientRaw.generateAuthUrl();
+        console.log("Dropbox: auth URL", url);
+        return url;
+    }
+    getRefreshToken(authCode) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const response = yield (0, util_1.promisify)(this.clientRaw.getToken)(authCode);
+            yield (0, util_1.promisify)(this.clientRaw.refreshToken)(response.refresh_token);
+            console.log("Dropbox: refresh token", response.refresh_token);
+            return response.refresh_token;
+        });
+    }
+    setRefreshToken(refreshToken) {
+        this.refreshToken = refreshToken;
+    }
     getUserInfo() {
-        return this.client({
-            resource: "users/get_current_account",
+        return __awaiter(this, void 0, void 0, function* () {
+            yield this.refreshTokenIfNeeded();
+            return yield this.client({
+                resource: "users/get_current_account",
+            });
         });
     }
     readdir(folder) {
         return __awaiter(this, void 0, void 0, function* () {
+            yield this.refreshTokenIfNeeded();
             try {
                 folder = this.normalizeFilePath(folder);
                 console.log(`Dropbox: list files ${folder} ...`);
@@ -82,66 +108,84 @@ class DropboxFsClient {
                 if ((err.error_summary + "").startsWith("path/not_found")) {
                     throw new fs_error_1.FsError("Path not dound", "path-not-found", err);
                 }
-                throw new fs_error_1.FsError(err.error_summary, "unknown");
+                throw new fs_error_1.FsError(err.error_summary || err, "unknown");
             }
         });
     }
     readFile(path, targetFile) {
-        path = this.normalizeFilePath(path);
-        console.log(`Dropbox: download file ${path} ...`);
-        return new Promise((resolve, reject) => {
-            const stream = this.clientRaw({
-                resource: "files/download",
-                parameters: {
-                    path,
-                },
-            }, (err) => {
-                if (err) {
-                    console.log(`Dropbox ERROR: ` + err);
-                    reject(err);
-                }
-            }).pipe(fs.createWriteStream(targetFile));
-            stream.on("finish", () => {
-                console.log(`Dropbox: ... done`);
-                resolve();
+        return __awaiter(this, void 0, void 0, function* () {
+            yield this.refreshTokenIfNeeded();
+            path = this.normalizeFilePath(path);
+            console.log(`Dropbox: download file ${path} ...`);
+            return yield new Promise((resolve, reject) => {
+                const stream = this.clientRaw({
+                    resource: "files/download",
+                    parameters: {
+                        path,
+                    },
+                }, (err) => {
+                    if (err) {
+                        console.log(`Dropbox ERROR: ` + err);
+                        reject(err);
+                    }
+                }).pipe(fs.createWriteStream(targetFile));
+                stream.on("finish", () => {
+                    console.log(`Dropbox: ... done`);
+                    resolve();
+                });
             });
         });
     }
     writeFile(sourceFile, targetPath) {
-        targetPath = this.normalizeFilePath(targetPath);
-        console.log(`Dropbox: upload file ${targetPath} ...`);
-        return new Promise((resolve, reject) => {
-            const uploadStream = this.clientRaw({
-                resource: "files/upload",
-                parameters: {
-                    path: targetPath,
-                    mode: "overwrite",
-                },
-            }, (err) => {
-                if (err) {
-                    console.log(`Dropbox ERROR: ` + err);
-                    reject(err);
-                }
-                else {
-                    console.log(`Dropbox: ... done`);
-                    resolve();
-                }
+        return __awaiter(this, void 0, void 0, function* () {
+            yield this.refreshTokenIfNeeded();
+            targetPath = this.normalizeFilePath(targetPath);
+            console.log(`Dropbox: upload file ${targetPath} ...`);
+            return yield new Promise((resolve, reject) => {
+                const uploadStream = this.clientRaw({
+                    resource: "files/upload",
+                    parameters: {
+                        path: targetPath,
+                        mode: "overwrite",
+                    },
+                }, (err) => {
+                    if (err) {
+                        console.log(`Dropbox ERROR: ` + err);
+                        reject(err);
+                    }
+                    else {
+                        console.log(`Dropbox: ... done`);
+                        resolve();
+                    }
+                });
+                fs.createReadStream(sourceFile).pipe(uploadStream);
             });
-            fs.createReadStream(sourceFile).pipe(uploadStream);
         });
     }
     unlinkFile(targetPath) {
-        targetPath = this.normalizeFilePath(targetPath);
-        console.log(`Dropbox: unlink file ${targetPath} ...`);
-        return this.client({
-            resource: "files/delete",
-            parameters: {
-                path: targetPath,
-            },
+        return __awaiter(this, void 0, void 0, function* () {
+            yield this.refreshTokenIfNeeded();
+            targetPath = this.normalizeFilePath(targetPath);
+            console.log(`Dropbox: unlink file ${targetPath} ...`);
+            return yield this.client({
+                resource: "files/delete",
+                parameters: {
+                    path: targetPath,
+                },
+            });
         });
     }
     normalizeFilePath(filePath) {
         return filePath.replace(/\\/g, "/");
+    }
+    refreshTokenIfNeeded() {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (new Date().getTime() > this.tokenExpiresTimestamp) {
+                const res = yield (0, util_1.promisify)(this.clientRaw.refreshToken)(this.refreshToken);
+                this.tokenExpiresTimestamp = new Date().getTime() + (res.expires_in - 60 * 10) * 1000;
+                console.log("Dropbox: token expires in", new Date(this.tokenExpiresTimestamp).toISOString());
+            }
+        });
     }
 }
 exports.DropboxFsClient = DropboxFsClient;

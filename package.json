@@ -33,6 +33,6 @@
         "typescript": "^4.4.4"
     },
     "dependencies": {
-        "dropbox-v2-api": "^2.4.51"
+        "dropbox-v2-api": "^2.5.3"
     }
 }

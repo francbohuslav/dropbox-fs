@@ -75,7 +75,18 @@ test("mocked remote", async () => {
 test.skip("real dropbox", async () => {
     await deleteTestedFiles();
     const client = new DropboxFsClient();
-    client.connect("--FILL-VALUE--");
+    const authCode = ""; // Run this test repeatedly and follow steps to set this
+    const refreshToken = ""; // Run this test repeatedly and follow steps to set this
+
+    client.init("", "", "http://localhost:4000/auth");
+    if (refreshToken) {
+        await client.setRefreshToken(refreshToken);
+    } else if (authCode) {
+        await client.getRefreshToken(authCode);
+    } else {
+        client.generateAuthUrl();
+    }
+
     const fs = new CachedFs(client, "/not-existed-storage", localDataStorage);
     const files = await fs.readdir("not-exists");
     expect(files).toEqual([]);
